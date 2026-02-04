@@ -1,0 +1,27 @@
+{
+  "name": "constitutional-playground",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An interactive platform for experimenting with Constitutional AI principles",
+  "scripts": {
+    "dev": "concurrently \"pnpm run dev:api\" \"pnpm run dev:web\"",
+    "dev:web": "cd apps/web && pnpm run dev",
+    "dev:api": "cd apps/api && uvicorn main:app --reload --port 8000",
+    "build": "cd apps/web && pnpm run build",
+    "start": "cd apps/web && pnpm run start",
+    "lint": "cd apps/web && pnpm run lint",
+    "test": "pytest apps/api && cd apps/web && pnpm run test"
+  },
+  "keywords": [
+    "constitutional-ai",
+    "ai-safety",
+    "anthropic",
+    "machine-learning",
+    "ai-alignment"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

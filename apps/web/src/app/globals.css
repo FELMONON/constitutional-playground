@@ -1,0 +1,206 @@
+@import "tailwindcss";
+
+:root {
+  /* Backgrounds - Warm off-white instead of pure white */
+  --bg-primary: #faf9f7;
+  --bg-secondary: #f5f4f2;
+  --bg-elevated: #ffffff;
+
+  /* Text */
+  --text-primary: #1a1a1a;
+  --text-secondary: #525252;
+  --text-tertiary: #737373;
+  --text-inverse: #ffffff;
+
+  /* Borders */
+  --border-default: #e5e5e5;
+  --border-focus: #1a1a1a;
+
+  /* Category Colors */
+  --category-safety: #ef4444;
+  --category-honesty: #3b82f6;
+  --category-helpfulness: #22c55e;
+  --category-ethics: #a855f7;
+
+  /* Shadows - Subtle */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.04);
+
+  /* Legacy variables for compatibility */
+  --background: var(--bg-primary);
+  --foreground: var(--text-primary);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #0f0f0f;
+    --bg-secondary: #171717;
+    --bg-elevated: #1c1c1c;
+    --text-primary: #f5f5f5;
+    --text-secondary: #a8a8a8;
+    --text-tertiary: #737373;
+    --text-inverse: #0f0f0f;
+    --border-default: #2e2e2e;
+    --border-focus: #fafafa;
+
+    /* Legacy variables */
+    --background: var(--bg-primary);
+    --foreground: var(--text-primary);
+  }
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Focus visible states for accessibility */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* Remove default focus outline since we're using focus-visible */
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-thumb {
+    background: #4b5563;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+  }
+}
+
+/* Animations */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Primary button style (Anthropic-style black) */
+.btn-primary {
+  height: 40px;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  background-color: var(--text-primary);
+  color: var(--text-inverse);
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #333333;
+}
+
+@media (prefers-color-scheme: dark) {
+  .btn-primary:hover:not(:disabled) {
+    background-color: #e5e5e5;
+  }
+}
+
+.btn-primary:disabled {
+  background-color: var(--border-default);
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+}
+
+/* Secondary button style */
+.btn-secondary {
+  height: 40px;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  background-color: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: border-color 0.15s ease;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--text-tertiary);
+}
+
+/* Ghost button style */
+.btn-ghost {
+  height: 40px;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  background-color: transparent;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background-color: var(--bg-secondary);
+}
+
+/* Button sizes */
+.btn-sm {
+  height: 32px;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.btn-lg {
+  height: 48px;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+/* Elevated card style */
+.card-elevated {
+  background-color: var(--bg-elevated);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-md);
+}
