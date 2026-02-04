@@ -12,7 +12,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://web-cyan-ten-16.vercel.app";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://tryconst.com";
 
 export const metadata: Metadata = {
   title: {
