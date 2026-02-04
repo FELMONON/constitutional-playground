@@ -85,29 +85,34 @@ A/B test different constitutions on the same prompt:
 - Python 3.10+
 - [Anthropic API Key](https://console.anthropic.com/)
 
-### One-Line Setup
-
-```bash
-git clone https://github.com/yourusername/constitutional-playground.git && cd constitutional-playground && cp .env.example .env && pnpm install && cd apps/web && pnpm install && cd ../api && pip install -r requirements.txt && cd ../.. && pnpm dev
-```
-
-Or step by step:
+### Setup
 
 ```bash
 # Clone
-git clone https://github.com/yourusername/constitutional-playground.git
+git clone https://github.com/FELMONON/constitutional-playground.git
 cd constitutional-playground
 
 # Configure
 cp .env.example .env
 # Add your ANTHROPIC_API_KEY to .env
 
-# Install
-pnpm install
+# Install dependencies
 cd apps/web && pnpm install && cd ../..
-cd apps/api && pip install -r requirements.txt && cd ../..
+pip3 install -r apps/api/requirements.txt
 
-# Run
+# Run both servers
+./start-dev.sh
+```
+
+Or run servers separately:
+
+```bash
+# Terminal 1: Backend (http://localhost:8000)
+cd apps/api
+python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+# Terminal 2: Frontend (http://localhost:3000)
+cd apps/web
 pnpm dev
 ```
 
