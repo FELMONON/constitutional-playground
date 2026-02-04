@@ -228,3 +228,83 @@ export async function getAvailableModels(): Promise<{
 }> {
   return fetchAPI("/api/models");
 }
+
+// Streaming event types
+export interface StreamEvent {
+  type:
+    | "generating"
+    | "generated"
+    | "critiquing"
+    | "critiqued"
+    | "revising"
+    | "revised"
+    | "complete"
+    | "error";
+  message: string;
+  round?: number;
+  response?: string;
+  revised_response?: string;
+  critiques?: PrincipleCritique[];
+  principles_triggered?: string[];
+  result?: CritiqueResult;
+  error?: string;
+}
+
+// Streaming full pipeline
+export async function runFullPipelineStreaming(
+  data: {
+    prompt: string;
+    constitution: Constitution;
+    max_rounds?: number;
+    model?: string;
+  },
+  onEvent: (event: StreamEvent) => void
+): Promise<void> {
+  const url = `${API_BASE_URL}/api/critique/full-pipeline/stream`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      prompt: data.prompt,
+      constitution: data.constitution,
+      max_rounds: data.max_rounds || 3,
+      model: data.model || "claude-sonnet-4-20250514",
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+    throw new Error(error.detail || `API error: ${response.status}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("No response body");
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        try {
+          const event = JSON.parse(line.slice(6)) as StreamEvent;
+          onEvent(event);
+        } catch {
+          // Skip invalid JSON
+        }
+      }
+    }
+  }
+}

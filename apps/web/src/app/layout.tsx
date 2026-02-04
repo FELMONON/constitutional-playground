@@ -12,10 +12,15 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://web-cyan-ten-16.vercel.app";
+
 export const metadata: Metadata = {
-  title: "Constitutional AI Playground",
+  title: {
+    default: "Constitutional AI Playground",
+    template: "%s | Constitutional AI Playground",
+  },
   description:
-    "An interactive platform for experimenting with Constitutional AI principles. Build custom AI constitutions, visualize self-critique, and compare different approaches.",
+    "An interactive platform for experimenting with Constitutional AI principles. Build custom AI constitutions, visualize self-critique loops, and compare different approaches to AI alignment.",
   keywords: [
     "Constitutional AI",
     "AI Safety",
@@ -23,19 +28,36 @@ export const metadata: Metadata = {
     "AI Alignment",
     "Machine Learning",
     "AI Ethics",
+    "RLHF",
+    "AI Governance",
+    "Self-Critique",
   ],
   authors: [{ name: "Constitutional AI Playground" }],
+  creator: "Constitutional AI Playground",
+  metadataBase: new URL(siteUrl),
   openGraph: {
     title: "Constitutional AI Playground",
     description:
-      "Experiment with Constitutional AI principles - build custom constitutions, visualize self-critique, and compare different approaches.",
+      "Build custom AI constitutions, visualize self-critique loops in real-time, and compare different approaches to AI alignment.",
+    url: siteUrl,
+    siteName: "Constitutional AI Playground",
+    locale: "en_US",
     type: "website",
-  },
+      },
   twitter: {
     card: "summary_large_image",
     title: "Constitutional AI Playground",
     description:
-      "Experiment with Constitutional AI principles - build custom constitutions, visualize self-critique, and compare different approaches.",
+      "Build custom AI constitutions and visualize self-critique loops in real-time. An interactive tool for AI alignment research.",
+    creator: "@anthropic",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
   },
 };
 

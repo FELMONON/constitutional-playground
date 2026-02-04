@@ -36,7 +36,7 @@ from models.schemas import (
 )
 
 import anthropic
-from typing import List, Optional
+from typing import List, Optional, Dict, Any, AsyncGenerator
 
 
 def schema_to_constitution(schema: ConstitutionSchema) -> Constitution:
@@ -179,6 +179,196 @@ class CAIEngineService:
 
         return [result_to_schema(r) for r in results]
 
+    async def run_full_pipeline_streaming(
+        self,
+        prompt: str,
+        constitution: ConstitutionSchema,
+        max_rounds: int = 3,
+        model: str = "claude-sonnet-4-20250514",
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Run the full CAI pipeline with streaming updates.
+
+        Yields events for each stage of the process.
+        """
+        const = schema_to_constitution(constitution)
+
+        # Event: Starting generation
+        yield {
+            "type": "generating",
+            "message": "Generating initial response...",
+        }
+
+        # Generate initial response
+        initial_response = await self.client.messages.create(
+            model=model,
+            max_tokens=1024,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        initial_text = initial_response.content[0].text
+
+        # Event: Generation complete
+        yield {
+            "type": "generated",
+            "message": "Initial response generated",
+            "response": initial_text,
+        }
+
+        # Run critique loop
+        current_response = initial_text
+        rounds = []
+        all_principles_triggered = []
+
+        for round_num in range(max_rounds):
+            # Event: Starting critique
+            yield {
+                "type": "critiquing",
+                "round": round_num + 1,
+                "message": f"Running critique round {round_num + 1}...",
+            }
+
+            # Run critique for this round
+            critiques = []
+            principles_triggered = []
+
+            for principle in const.principles:
+                if not principle.enabled:
+                    continue
+
+                critique_prompt = f"""Analyze this AI response for the following principle:
+
+Principle: {principle.name}
+Description: {principle.description}
+Critique question: {principle.critique_prompt}
+
+User prompt: {prompt}
+
+AI response: {current_response}
+
+Does this response violate or could improve on this principle?
+Respond in JSON format:
+{{"triggered": true/false, "critique": "your critique", "severity": 0.0-1.0, "suggestions": ["suggestion1", "suggestion2"]}}"""
+
+                critique_response = await self.client.messages.create(
+                    model=model,
+                    max_tokens=512,
+                    messages=[{"role": "user", "content": critique_prompt}],
+                )
+
+                try:
+                    import json
+                    critique_text = critique_response.content[0].text
+                    # Extract JSON from response
+                    start = critique_text.find("{")
+                    end = critique_text.rfind("}") + 1
+                    if start >= 0 and end > start:
+                        critique_data = json.loads(critique_text[start:end])
+                        if critique_data.get("triggered", False):
+                            critiques.append({
+                                "principle_id": principle.id,
+                                "principle_name": principle.name,
+                                "triggered": True,
+                                "critique_text": critique_data.get("critique", ""),
+                                "severity": critique_data.get("severity", 0.5),
+                                "suggestions": critique_data.get("suggestions", []),
+                            })
+                            principles_triggered.append(principle.id)
+                except:
+                    pass
+
+            # Event: Critique complete
+            yield {
+                "type": "critiqued",
+                "round": round_num + 1,
+                "message": f"Critique round {round_num + 1} complete",
+                "critiques": critiques,
+                "principles_triggered": principles_triggered,
+            }
+
+            # Check if we should revise
+            if not critiques:
+                # No critiques - we've converged
+                rounds.append({
+                    "round_number": round_num,
+                    "input_response": current_response,
+                    "critiques": critiques,
+                    "revised_response": current_response,
+                    "principles_triggered": principles_triggered,
+                    "confidence": 1.0,
+                    "diff_summary": "No changes needed - response aligns with all principles.",
+                })
+                break
+
+            # Event: Starting revision
+            yield {
+                "type": "revising",
+                "round": round_num + 1,
+                "message": f"Revising response for round {round_num + 1}...",
+            }
+
+            # Build revision prompt
+            critique_text = "\n".join([
+                f"- {c['principle_name']}: {c['critique_text']}"
+                for c in critiques
+            ])
+
+            revision_prompt = f"""Revise this AI response based on the following critiques:
+
+Original prompt: {prompt}
+
+Current response: {current_response}
+
+Critiques:
+{critique_text}
+
+Please provide an improved response that addresses these critiques while remaining helpful and accurate."""
+
+            revision_response = await self.client.messages.create(
+                model=model,
+                max_tokens=1024,
+                messages=[{"role": "user", "content": revision_prompt}],
+            )
+            revised_text = revision_response.content[0].text
+
+            # Event: Revision complete
+            yield {
+                "type": "revised",
+                "round": round_num + 1,
+                "message": f"Revision for round {round_num + 1} complete",
+                "revised_response": revised_text,
+            }
+
+            rounds.append({
+                "round_number": round_num,
+                "input_response": current_response,
+                "critiques": critiques,
+                "revised_response": revised_text,
+                "principles_triggered": principles_triggered,
+                "confidence": 1.0 - (len(critiques) * 0.1),
+                "diff_summary": f"Addressed {len(critiques)} principle(s)",
+            })
+
+            all_principles_triggered.extend(principles_triggered)
+            current_response = revised_text
+
+        # Event: Complete
+        yield {
+            "type": "complete",
+            "message": "Constitutional AI pipeline complete",
+            "result": {
+                "original": initial_text,
+                "final": current_response,
+                "prompt": prompt,
+                "rounds": rounds,
+                "total_rounds": len(rounds),
+                "constitution_id": const.id,
+                "constitution_name": const.name,
+                "converged": len(rounds) < max_rounds or not rounds[-1]["critiques"],
+                "total_principles_triggered": list(set(all_principles_triggered)),
+                "improvement_score": 0.0,
+            },
+        }
+
 
 # Singleton instance
 _engine: Optional[CAIEngineService] = None
@@ -190,3 +380,8 @@ def get_engine() -> CAIEngineService:
     if _engine is None:
         _engine = CAIEngineService()
     return _engine
+
+
+def get_streaming_engine() -> CAIEngineService:
+    """Get or create the CAI engine for streaming (same instance)."""
+    return get_engine()

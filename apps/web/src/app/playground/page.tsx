@@ -16,7 +16,13 @@ import { cn } from "@/lib/utils";
 import { ConstitutionEditor } from "@/components/ConstitutionEditor";
 import { CritiqueVisualizer } from "@/components/CritiqueVisualizer";
 import type { Constitution, CritiqueResult } from "@/types";
-import { listConstitutions, runFullPipeline, runCritique } from "@/lib/api";
+import {
+  listConstitutions,
+  runFullPipeline,
+  runCritique,
+  runFullPipelineStreaming,
+  type StreamEvent,
+} from "@/lib/api";
 
 // Default constitutions for demo/offline mode
 const defaultConstitutions: Constitution[] = [
@@ -81,6 +87,9 @@ export default function PlaygroundPage() {
   const [activePanel, setActivePanel] = useState<"editor" | "results">("editor");
   const [maxRounds, setMaxRounds] = useState(3);
   const [showSettings, setShowSettings] = useState(false);
+  const [useStreaming, setUseStreaming] = useState(true);
+  const [streamStatus, setStreamStatus] = useState<string | null>(null);
+  const [streamRound, setStreamRound] = useState<number>(0);
 
   // Load constitutions from API
   useEffect(() => {
@@ -107,34 +116,79 @@ export default function PlaygroundPage() {
     setIsLoading(true);
     setError(null);
     setActivePanel("results");
+    setStreamStatus(null);
+    setStreamRound(0);
 
     try {
       let result: CritiqueResult;
 
       if (useCustomResponse && customResponse.trim()) {
-        // Run critique on custom response
+        // Run critique on custom response (non-streaming)
         result = await runCritique({
           prompt: prompt.trim(),
           response: customResponse.trim(),
           constitution: selectedConstitution,
           max_rounds: maxRounds,
         });
+        setCritiqueResult(result);
+      } else if (useStreaming) {
+        // Run full pipeline with streaming
+        await runFullPipelineStreaming(
+          {
+            prompt: prompt.trim(),
+            constitution: selectedConstitution,
+            max_rounds: maxRounds,
+          },
+          (event: StreamEvent) => {
+            // Update UI based on stream events
+            switch (event.type) {
+              case "generating":
+                setStreamStatus("Generating initial response...");
+                break;
+              case "generated":
+                setStreamStatus("Initial response ready");
+                break;
+              case "critiquing":
+                setStreamStatus(`Critiquing round ${event.round}...`);
+                setStreamRound(event.round || 0);
+                break;
+              case "critiqued":
+                setStreamStatus(`Round ${event.round} critique complete`);
+                break;
+              case "revising":
+                setStreamStatus(`Revising for round ${event.round}...`);
+                break;
+              case "revised":
+                setStreamStatus(`Round ${event.round} revision complete`);
+                break;
+              case "complete":
+                if (event.result) {
+                  setCritiqueResult(event.result);
+                }
+                setStreamStatus(null);
+                break;
+              case "error":
+                setError(event.error || "Streaming error");
+                break;
+            }
+          }
+        );
       } else {
-        // Run full pipeline (generate + critique)
+        // Run full pipeline (generate + critique) without streaming
         result = await runFullPipeline({
           prompt: prompt.trim(),
           constitution: selectedConstitution,
           max_rounds: maxRounds,
         });
+        setCritiqueResult(result);
       }
-
-      setCritiqueResult(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to run critique");
     } finally {
       setIsLoading(false);
+      setStreamStatus(null);
     }
-  }, [selectedConstitution, prompt, customResponse, useCustomResponse, maxRounds]);
+  }, [selectedConstitution, prompt, customResponse, useCustomResponse, useStreaming, maxRounds]);
 
   const handleConstitutionChange = useCallback((updated: Constitution) => {
     setSelectedConstitution(updated);
@@ -177,14 +231,25 @@ export default function PlaygroundPage() {
             <button
               onClick={handleRunCritique}
               disabled={isLoading || !prompt.trim()}
-              className="flex items-center gap-2 h-10 px-4 bg-[var(--text-primary)] hover:bg-[#333] dark:hover:bg-[#e5e5e5] disabled:bg-[var(--border-default)] disabled:text-[var(--text-tertiary)] text-[var(--text-inverse)] rounded-lg font-medium transition-colors"
+              className="flex items-center gap-2 h-10 px-4 bg-[var(--text-primary)] hover:bg-[#333] dark:hover:bg-[#e5e5e5] disabled:bg-[var(--border-default)] disabled:text-[var(--text-tertiary)] text-[var(--text-inverse)] rounded-lg font-medium transition-colors min-w-[140px] justify-center"
             >
               {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {streamStatus ? (
+                    <span className="text-xs truncate max-w-[100px]">
+                      {streamRound > 0 ? `Round ${streamRound}` : "Starting..."}
+                    </span>
+                  ) : (
+                    "Running..."
+                  )}
+                </>
               ) : (
-                <Play className="w-4 h-4" />
+                <>
+                  <Play className="w-4 h-4" />
+                  Run Critique
+                </>
               )}
-              Run Critique
             </button>
           </div>
         </div>
@@ -226,6 +291,19 @@ export default function PlaygroundPage() {
                       className="rounded border-[var(--border-default)] text-[var(--text-primary)]"
                     />
                     <span className="text-sm text-[var(--text-secondary)]">Use custom response</span>
+                  </label>
+                </div>
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      aria-checked={useStreaming}
+                      checked={useStreaming}
+                      onChange={(e) => setUseStreaming(e.target.checked)}
+                      className="rounded border-[var(--border-default)] text-[var(--text-primary)]"
+                    />
+                    <span className="text-sm text-[var(--text-secondary)]">Stream updates</span>
                   </label>
                 </div>
               </div>
@@ -382,7 +460,25 @@ export default function PlaygroundPage() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
               >
-                <CritiqueVisualizer result={critiqueResult} isLoading={isLoading} />
+                {streamStatus && isLoading ? (
+                  <div className="flex flex-col items-center justify-center py-16 gap-4">
+                    <div className="relative">
+                      <Loader2 className="w-12 h-12 animate-spin text-blue-500" />
+                      {streamRound > 0 && (
+                        <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-blue-600">
+                          {streamRound}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[var(--text-secondary)] font-medium">{streamStatus}</p>
+                    <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
+                      <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                      Streaming updates in real-time
+                    </div>
+                  </div>
+                ) : (
+                  <CritiqueVisualizer result={critiqueResult} isLoading={isLoading} />
+                )}
               </motion.div>
             )}
           </AnimatePresence>
